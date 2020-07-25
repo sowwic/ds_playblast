@@ -11,7 +11,7 @@ from dsPlayblast import loggingFn
 def main():
     # Init application
     app = QtWidgets.QApplication(os.sys.argv)
-    # app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api="pyside2"))
+    app.setStyleSheet(qdarkstyle.load_stylesheet(qt_api="pyside2"))
 
     # Logging
     loggingFn.setup_logging()
@@ -19,7 +19,6 @@ def main():
 
     # Init interface
     mainWindow = playblastUI.PlayblastWindow()
-    mainWindow.setPalette(styles.darkPallete())
     mainWindow.show()
 
     # Debug
