@@ -4,6 +4,7 @@ from PySide2 import QtCore
 from dsPlayblast import util
 from dsPlayblast import ffmpegFn
 from dsPlayblast import widgets
+from dsPlayblast import clientFn
 
 LOGGER = logging.getLogger(__name__)
 
@@ -23,9 +24,11 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("dsPlayblast")
         self.setMinimumSize(300, 400)
 
-        # Settings
+        # Load base settings
         self.settings = QtCore.QSettings("dsPlayblast", "main")
-        self.always_on_top = self.settings.value("always_on_top", defaultValue=False)
+        self.always_on_top = self.settings.value("always_on_top", defaultValue=0)
+        self.maya_port = self.settings.value("maya_port", defaultValue=7221)
+        self.mayaClient: clientFn.MayaClient = None
         self.resize(self.settings.value("window_width", defaultValue=400), self.settings.value("window_height", defaultValue=560))
 
         # Build UI
@@ -34,24 +37,22 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.create_layouts()
         self.create_connections()
 
+        # Auto connect
+        if self.settings.value("autoconnect_onstart"):
+            self.connect_to_maya()
+
     @property
-    def always_on_top(self) -> bool:
+    def always_on_top(self) -> int:
         return self._always_on_top
 
     @always_on_top.setter
     def always_on_top(self, state):
-        if isinstance(state, str):
-            state = util.str_to_bool(state)
-        self._always_on_top = state
+        self._always_on_top = int(state)
         if state:
             self.setWindowFlags(self.windowFlags() | QtCore.Qt.WindowStaysOnTopHint)
         else:
             self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowStaysOnTopHint)
         self.show()
-
-    @QtCore.Slot()
-    def toggle_always_on_top(self) -> None:
-        self.always_on_top = not self.always_on_top
 
     # Events
     def closeEvent(self, event):
@@ -60,12 +61,52 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     # Settings
     def save_settings(self):
+        # Window
+        self.settings.setValue("window_width", self.width())
+        self.settings.setValue("window_height", self.height())
+        # Client
+        self.settings.setValue("maya_port", self.maya_port)
+        # Action
         self.settings.setValue("always_on_top", self.always_on_top)
+        self.settings.setValue("autoconnect_onstart", int(self.autoconnect_onstart_action.isChecked()))
+
+        # Ffmpeg
         self.settings.setValue("ffmpeg_path", self.ffmpeg_path.path_line_edit.text())
+        # Image
+        self.settings.setValue("image_size_index", self.image_size.currentIndex())
+        self.settings.setValue("image_quality", self.image_quality.spin_box.value())
+        self.settings.setValue("image_scale", self.image_scale.spin_box.value())
+        self.settings.setValue("image_frame_padding", self.image_frame_padding.spin_box.value())
+        # Output
+        self.settings.setValue("output_viewer_checkbox_checked", int(self.output_viewer_checkbox.isChecked()))
+        self.settings.setValue("output_ornaments_checkbox_checked", int(self.output_ornaments_checkbox.isChecked()))
+        self.settings.setValue("output_removetemp_checkbox_checked", int(self.output_removetemp_checkbox.isChecked()))
+        self.settings.setValue("output_offscreen_checkbox_checked", int(self.output_offscreen_checkbox.isChecked()))
+        self.settings.setValue("output_multicamera_checkbox_checked", int(self.output_multicamera_checkbox.isChecked()))
 
     # Build components
     def create_actions(self):
-        pass
+        # Create actions
+        self.connect_to_maya_action = QtWidgets.QAction("Connect to maya", self)
+        self.set_maya_port_action = QtWidgets.QAction("Set Maya port", self)
+        self.autoconnect_onstart_action = QtWidgets.QAction("Auto connect", self)
+        self.autoconnect_onstart_action.setCheckable(1)
+        self.autoconnect_onstart_action.setChecked(self.settings.value("autoconnect_onstart", defaultValue=0))
+        self.always_on_top_action = QtWidgets.QAction("Window always on top", self)
+        self.always_on_top_action.setCheckable(1)
+        self.always_on_top_action.setChecked(self.settings.value("always_on_top", 0))
+        self.ffmpeg_help_action = QtWidgets.QAction("FFmpeg help", self)
+        self.ffmpeg_help_action.setIcon(self.style().standardIcon(QtWidgets.QStyle.SP_DialogHelpButton))
+
+        # Create menus
+        self.options_menu = self.menuBar().addMenu("&Options")
+        self.options_menu.addAction(self.set_maya_port_action)
+        self.options_menu.addAction(self.connect_to_maya_action)
+        self.options_menu.addAction(self.autoconnect_onstart_action)
+        self.options_menu.addAction(self.always_on_top_action)
+
+        self.help_menu = self.menuBar().addMenu("Help")
+        self.help_menu.addAction(self.ffmpeg_help_action)
 
     def create_widgets(self):
         self.main_widget = QtWidgets.QWidget()
@@ -83,14 +124,14 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
         # Image settings
         self.image_grp = QtWidgets.QGroupBox("Image")
-        self.image_mode = QtWidgets.QComboBox()
-        self.image_mode.addItems([res[2] for res in PlayblastWindow.resolutions])
-        self.image_mode.setCurrentIndex(self.settings.value("image_mode_index", defaultValue=0))
+        self.image_size = QtWidgets.QComboBox()
+        self.image_size.addItems([res[2] for res in PlayblastWindow.resolutions])
+        self.image_size.setCurrentIndex(self.settings.value("image_size_index", defaultValue=0))
         self.image_scale = widgets.FieldSliderGroup(data_type="float",
                                                     label_text="Scale:",
                                                     min_value=0.1,
                                                     max_value=1.0,
-                                                    default_value=1.0,
+                                                    default_value=self.settings.value("image_scale", defaultValue=1.0),
                                                     step=0.1,
                                                     slider_multiplier=100.0)
         self.image_frame_padding = widgets.FieldSliderGroup(data_type="int",
@@ -98,14 +139,14 @@ class PlayblastWindow(QtWidgets.QMainWindow):
                                                             min_value=0,
                                                             max_value=4,
                                                             step=1.0,
-                                                            default_value=4.0,
+                                                            default_value=self.settings.value("image_frame_padding", defaultValue=4),
                                                             slider_multiplier=1.0)
         self.image_quality = widgets.FieldSliderGroup(data_type="int",
                                                       label_text="Quality:",
                                                       min_value=0,
                                                       max_value=100,
                                                       step=1.0,
-                                                      default_value=75,
+                                                      default_value=self.settings.value("image_quality", defaultValue=75),
                                                       slider_multiplier=1.0)
 
         # Output prefs
@@ -121,14 +162,20 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.output_offscreen_checkbox = QtWidgets.QCheckBox("Render offscreen")
         self.output_multicamera_checkbox = QtWidgets.QCheckBox("Multi-camera output")
         self.output_removetemp_checkbox = QtWidgets.QCheckBox("Removed temporary files")
-        self.output_viewer_checkbox.setChecked(self.settings.value("output_viewer_checkbox_checked", defaultValue=True))
-        self.output_ornaments_checkbox.setChecked(self.settings.value("output_offscreen_checkbox_checked", defaultValue=True))
-        self.output_offscreen_checkbox.setChecked(self.settings.value("output_offscreen_checkbox_checked", defaultValue=False))
-        self.output_multicamera_checkbox.setChecked(self.settings.value("output_multicamera_checkbox_checked", defaultValue=False))
-        self.output_removetemp_checkbox.setChecked(self.settings.value("output_removetemp_checkbox_checked", defaultValue=True))
+        self.output_viewer_checkbox.setChecked(self.settings.value("output_viewer_checkbox_checked", defaultValue=1))
+        self.output_ornaments_checkbox.setChecked(self.settings.value("output_ornaments_checkbox_checked", defaultValue=1))
+        self.output_offscreen_checkbox.setChecked(self.settings.value("output_offscreen_checkbox_checked", defaultValue=0))
+        self.output_multicamera_checkbox.setChecked(self.settings.value("output_multicamera_checkbox_checked", defaultValue=0))
+        self.output_removetemp_checkbox.setChecked(self.settings.value("output_removetemp_checkbox_checked", defaultValue=1))
 
         # Buttons
         self.playblast_btn = QtWidgets.QPushButton("Playblast")
+
+        # Status bar
+        self.statusBar = QtWidgets.QStatusBar()
+        self.progressBar = QtWidgets.QProgressBar()
+        self.progressBar.setVisible(0)
+        self.statusBar.addPermanentWidget(self.progressBar)
 
     def create_layouts(self):
         self.setContentsMargins(0, 0, 0, 0)
@@ -139,15 +186,15 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.scroll_widget.contentLayout.addWidget(self.image_grp)
         self.scroll_widget.contentLayout.addWidget(self.output_grp)
         self.main_layout.addWidget(self.playblast_btn)
-        self.main_layout.setContentsMargins(5, 30, 5, 5)
-        self.main_layout.setSpacing(2)
+        self.main_layout.addWidget(self.statusBar)
+        self.main_layout.setContentsMargins(5, 5, 5, 0)
 
         self.ffmpeg_layout = QtWidgets.QVBoxLayout()
         self.ffmpeg_layout.addWidget(self.ffmpeg_path)
         self.ffmpeg_grp.setLayout(self.ffmpeg_layout)
 
         self.image_layout = QtWidgets.QVBoxLayout()
-        self.image_layout.addWidget(self.image_mode)
+        self.image_layout.addWidget(self.image_size)
         self.image_layout.addWidget(self.image_quality)
         self.image_layout.addWidget(self.image_scale)
         self.image_layout.addWidget(self.image_frame_padding)
@@ -155,6 +202,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
         self.output_layout = QtWidgets.QVBoxLayout()
         self.output_layout.addWidget(self.output_path)
+        self.output_layout.addWidget(self.output_viewer_checkbox)
         self.output_layout.addWidget(self.output_ornaments_checkbox)
         self.output_layout.addWidget(self.output_removetemp_checkbox)
         self.output_layout.addWidget(self.output_offscreen_checkbox)
@@ -162,4 +210,35 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.output_grp.setLayout(self.output_layout)
 
     def create_connections(self):
-        pass
+        # Actions
+        self.always_on_top_action.toggled.connect(self.toggle_always_on_top)
+        self.set_maya_port_action.triggered.connect(self.set_maya_port)
+        self.connect_to_maya_action.triggered.connect(self.connect_to_maya)
+
+        # Buttons
+        self.playblast_btn.clicked.connect(self.playblast)
+
+        # Status bar
+        self.statusBar.messageChanged.connect(self.toggleStatusBar)
+
+    @QtCore.Slot()
+    def toggle_always_on_top(self) -> None:
+        self.always_on_top = not self.always_on_top
+
+    @QtCore.Slot()
+    def toggleStatusBar(self, state) -> None:
+        print(bool(state))
+        self.statusBar.setVisible(bool(state))
+
+    @QtCore.Slot()
+    def connect_to_maya(self) -> None:
+        self.statusBar.showMessage("Connecting to maya...", 5000)
+        LOGGER.info(f"TODO: Connect to maya port {self.maya_port}")
+
+    @QtCore.Slot()
+    def set_maya_port(self) -> None:
+        LOGGER.info("TODO: Set maya port dialog...")
+
+    @QtCore.Slot()
+    def playblast(self) -> None:
+        LOGGER.info("TODO: self.playblast function")

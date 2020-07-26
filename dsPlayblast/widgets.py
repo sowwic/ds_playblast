@@ -31,6 +31,12 @@ class FieldSliderGroup(QtWidgets.QWidget):
         self.min_value = min_value
         self.max_value = max_value
         self.step = step
+
+        if isinstance(default_value, str):
+            if data_type == "float":
+                default_value = float(default_value)
+            elif data_type == "int":
+                default_value = int(default_value)
         self.spin_box.setValue(default_value)
 
     @property
