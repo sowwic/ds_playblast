@@ -1,4 +1,5 @@
 import logging
+import webbrowser
 from PySide2 import QtWidgets
 from PySide2 import QtCore
 from dsPlayblast import util
@@ -95,7 +96,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.always_on_top_action = QtWidgets.QAction("Window always on top", self)
         self.always_on_top_action.setCheckable(1)
         self.always_on_top_action.setChecked(self.settings.value("always_on_top", 0))
-        self.ffmpeg_help_action = QtWidgets.QAction("FFmpeg help", self)
+        self.ffmpeg_help_action = QtWidgets.QAction("FFmpeg download", self)
         self.ffmpeg_help_action.setIcon(self.style().standardIcon(QtWidgets.QStyle.SP_DialogHelpButton))
 
         # Create menus
@@ -214,6 +215,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.always_on_top_action.toggled.connect(self.toggle_always_on_top)
         self.set_maya_port_action.triggered.connect(self.set_maya_port)
         self.connect_to_maya_action.triggered.connect(self.connect_to_maya)
+        self.ffmpeg_help_action.triggered.connect(self.open_ffmpeg_web)
 
         # Buttons
         self.playblast_btn.clicked.connect(self.playblast)
@@ -227,8 +229,11 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def toggleStatusBar(self, state) -> None:
-        print(bool(state))
         self.statusBar.setVisible(bool(state))
+
+    @QtCore.Slot()
+    def open_ffmpeg_web(self):
+        webbrowser.open(url="https://ffmpeg.org/", new=2, autoraise=True)
 
     @QtCore.Slot()
     def connect_to_maya(self) -> None:
@@ -237,8 +242,18 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def set_maya_port(self) -> None:
-        LOGGER.info("TODO: Set maya port dialog...")
+        value, result = QtWidgets.QInputDialog.getInt(self, "Maya port",
+                                                      "Current port:",
+                                                      value=self.maya_port,
+                                                      minValue=1025,
+                                                      maxValue=65535)
+        if not result:
+            return
+
+        self.maya_port = value
+        LOGGER.info(f"Maya port set to {self.maya_port}")
 
     @QtCore.Slot()
     def playblast(self) -> None:
-        LOGGER.info("TODO: self.playblast function")
+        LOGGER.info("TODO: send playblast command to maya")
+        LOGGER.info("TODO: convert with ffmpeg")

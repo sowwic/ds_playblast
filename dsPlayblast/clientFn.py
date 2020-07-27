@@ -7,7 +7,7 @@ LOGGER = logging.getLogger(__name__)
 class MayaClient(object):
     """
     """
-    PORT = 7220
+    PORT = 7221
     BUFFER_SIZE = 4096
 
     def __init__(self):
