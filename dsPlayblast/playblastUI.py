@@ -38,6 +38,8 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.create_layouts()
         self.create_connections()
 
+        self.validate_paths()
+
         # Auto connect
         if self.settings.value("autoconnect_onstart"):
             self.connect_to_maya()
@@ -155,7 +157,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.output_path = widgets.BrowsePath(lable_text="Output file:",
                                               button_text="...",
                                               mode="saveFile",
-                                              default_path=self.settings.value("output_path", defaultValue=" "),
+                                              default_path=self.settings.value("output_path", defaultValue=""),
                                               file_dialog_title="Save playblast as",
                                               filters="*.mp4")
         self.output_viewer_checkbox = QtWidgets.QCheckBox("Open viewer")
@@ -171,12 +173,15 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
         # Buttons
         self.playblast_btn = QtWidgets.QPushButton("Playblast")
+        self.playblast_btn.setMinimumHeight(25)
 
         # Status bar
-        self.statusBar = QtWidgets.QStatusBar()
-        self.progressBar = QtWidgets.QProgressBar()
-        self.progressBar.setVisible(0)
-        self.statusBar.addPermanentWidget(self.progressBar)
+        # self.statusBar = QtWidgets.QStatusBar()
+        self.statusBar = widgets.StatusLogger(level="DEBUG", timeout=4000)
+        LOGGER.addHandler(self.statusBar)
+        self.progressBar = widgets.dsProgressBar()
+        self.progressBar.hide()
+        self.statusBar.widget.addPermanentWidget(self.progressBar)
 
     def create_layouts(self):
         self.setContentsMargins(0, 0, 0, 0)
@@ -187,8 +192,8 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.scroll_widget.contentLayout.addWidget(self.image_grp)
         self.scroll_widget.contentLayout.addWidget(self.output_grp)
         self.main_layout.addWidget(self.playblast_btn)
-        self.main_layout.addWidget(self.statusBar)
-        self.main_layout.setContentsMargins(5, 5, 5, 0)
+        self.main_layout.addWidget(self.statusBar.widget)
+        self.main_layout.setContentsMargins(0, 0, 0, 2)
 
         self.ffmpeg_layout = QtWidgets.QVBoxLayout()
         self.ffmpeg_layout.addWidget(self.ffmpeg_path)
@@ -217,11 +222,16 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.connect_to_maya_action.triggered.connect(self.connect_to_maya)
         self.ffmpeg_help_action.triggered.connect(self.open_ffmpeg_web)
 
+        # Inputs
+        self.ffmpeg_path.path_line_edit.textChanged.connect(self.validate_paths)
+        self.output_path.path_line_edit.textChanged.connect(self.validate_paths)
+
         # Buttons
         self.playblast_btn.clicked.connect(self.playblast)
 
         # Status bar
-        self.statusBar.messageChanged.connect(self.toggleStatusBar)
+        self.statusBar.widget.messageChanged.connect(self.toggleStatusBar)
+        self.progressBar.visibilityChanged.connect(self.toggleStatusBar)
 
     @QtCore.Slot()
     def toggle_always_on_top(self) -> None:
@@ -229,7 +239,9 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def toggleStatusBar(self, state) -> None:
-        self.statusBar.setVisible(bool(state))
+        if self.progressBar.isVisible():
+            return
+        self.statusBar.widget.setVisible(bool(state))
 
     @QtCore.Slot()
     def open_ffmpeg_web(self):
@@ -237,8 +249,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def connect_to_maya(self) -> None:
-        self.statusBar.showMessage("Connecting to maya...", 5000)
-        LOGGER.info(f"TODO: Connect to maya port {self.maya_port}")
+        LOGGER.info(f"TODO: Connecting to maya port {self.maya_port}")
 
     @QtCore.Slot()
     def set_maya_port(self) -> None:
@@ -254,6 +265,17 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         LOGGER.info(f"Maya port set to {self.maya_port}")
 
     @QtCore.Slot()
+    def validate_paths(self):
+        if len(self.output_path.path_line_edit.text().split("/")) < 2 or not self.ffmpeg_path.path_line_edit.text().endswith("ffmpeg.exe"):
+            self.playblast_btn.setEnabled(False)
+        else:
+            self.playblast_btn.setEnabled(True)
+
+    @QtCore.Slot()
     def playblast(self) -> None:
+        self.progressBar.show()
+        self.progressBar.setMinimum(0)
+        self.progressBar.setMaximum(0)
         LOGGER.info("TODO: send playblast command to maya")
         LOGGER.info("TODO: convert with ffmpeg")
+        # self.progressBar.hide()

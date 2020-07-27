@@ -201,3 +201,30 @@ class ScrollWidget(QtWidgets.QWidget):
 
     def resizeEvent(self, e):
         self.scrollArea.resizeEvent(e)
+
+
+class StatusLogger(logging.Handler):
+    def __init__(self, level="DEBUG", parent=None, timeout=3000):
+        super().__init__(level)
+        self.widget = QtWidgets.QStatusBar(parent)
+        self.timeout = 3000
+
+    def emit(self, record: logging.LogRecord):
+        msg = self.format(record)
+        self.widget.showMessage(msg, self.timeout)
+
+
+class dsProgressBar(QtWidgets.QProgressBar):
+
+    visibilityChanged = QtCore.Signal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent=None)
+
+    def showEvent(self, event):
+        # super().showEvent(event)
+        self.visibilityChanged.emit(True)
+
+    def hideEvent(self, event):
+        # super().hideEvent(event)
+        self.visibilityChanged.emit(False)
