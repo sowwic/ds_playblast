@@ -8,6 +8,8 @@ from dsPlayblast import ffmpegFn
 from dsPlayblast import widgets
 from dsPlayblast import clientFn
 
+__version__ = 1.0
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -296,14 +298,18 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     @ QtCore.Slot()
     def playblast(self) -> None:
-        self.progressBar.show()
         self.progressBar.setMinimum(0)
         self.progressBar.setMaximum(5)
         self.progressBar.setValue(0)
+        self.progressBar.show()
 
         # Playblast
         self.update_progress_bar()
-        self.maya_client.connect()
+        if not self.maya_client.connect():
+            LOGGER.error("Failed to connect to Maya")
+            self.progressBar.hide()
+            return
+
         self.update_progress_bar()
         avi_result_path = self.output_path.get_path().replace(".mp4", ".avi")
         self.update_progress_bar()
