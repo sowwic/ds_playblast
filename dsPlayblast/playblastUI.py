@@ -1,8 +1,9 @@
 import logging
+import os
+import time
 import webbrowser
 from PySide2 import QtWidgets
 from PySide2 import QtCore
-from dsPlayblast import util
 from dsPlayblast import ffmpegFn
 from dsPlayblast import widgets
 from dsPlayblast import clientFn
@@ -28,8 +29,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         # Load base settings
         self.settings = QtCore.QSettings("dsPlayblast", "main")
         self.always_on_top = self.settings.value("always_on_top", defaultValue=0)
-        self.maya_port = self.settings.value("maya_port", defaultValue=7221)
-        self.mayaClient: clientFn.MayaClient = None
+        self.maya_client = clientFn.MayaClient(port=self.settings.value("maya_port", defaultValue=7221))
         self.resize(self.settings.value("window_width", defaultValue=400), self.settings.value("window_height", defaultValue=560))
 
         # Build UI
@@ -39,10 +39,6 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.create_connections()
 
         self.validate_paths()
-
-        # Auto connect
-        if self.settings.value("autoconnect_onstart"):
-            self.connect_to_maya()
 
     @property
     def always_on_top(self) -> int:
@@ -68,10 +64,9 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.settings.setValue("window_width", self.width())
         self.settings.setValue("window_height", self.height())
         # Client
-        self.settings.setValue("maya_port", self.maya_port)
+        self.settings.setValue("maya_port", self.maya_client.port)
         # Action
         self.settings.setValue("always_on_top", self.always_on_top)
-        self.settings.setValue("autoconnect_onstart", int(self.autoconnect_onstart_action.isChecked()))
 
         # Ffmpeg
         self.settings.setValue("ffmpeg_path", self.ffmpeg_path.path_line_edit.text())
@@ -81,6 +76,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.settings.setValue("image_scale", self.image_scale.spin_box.value())
         self.settings.setValue("image_frame_padding", self.image_frame_padding.spin_box.value())
         # Output
+        self.settings.setValue("output_path", self.output_path.get_path())
         self.settings.setValue("output_viewer_checkbox_checked", int(self.output_viewer_checkbox.isChecked()))
         self.settings.setValue("output_ornaments_checkbox_checked", int(self.output_ornaments_checkbox.isChecked()))
         self.settings.setValue("output_removetemp_checkbox_checked", int(self.output_removetemp_checkbox.isChecked()))
@@ -90,11 +86,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
     # Build components
     def create_actions(self):
         # Create actions
-        self.connect_to_maya_action = QtWidgets.QAction("Connect to maya", self)
         self.set_maya_port_action = QtWidgets.QAction("Set Maya port", self)
-        self.autoconnect_onstart_action = QtWidgets.QAction("Auto connect", self)
-        self.autoconnect_onstart_action.setCheckable(1)
-        self.autoconnect_onstart_action.setChecked(self.settings.value("autoconnect_onstart", defaultValue=0))
         self.always_on_top_action = QtWidgets.QAction("Window always on top", self)
         self.always_on_top_action.setCheckable(1)
         self.always_on_top_action.setChecked(self.settings.value("always_on_top", 0))
@@ -104,8 +96,6 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         # Create menus
         self.options_menu = self.menuBar().addMenu("&Options")
         self.options_menu.addAction(self.set_maya_port_action)
-        self.options_menu.addAction(self.connect_to_maya_action)
-        self.options_menu.addAction(self.autoconnect_onstart_action)
         self.options_menu.addAction(self.always_on_top_action)
 
         self.help_menu = self.menuBar().addMenu("Help")
@@ -178,8 +168,11 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         # Status bar
         # self.statusBar = QtWidgets.QStatusBar()
         self.statusBar = widgets.StatusLogger(level="DEBUG", timeout=4000)
+        self.statusBar.setFormatter(LOGGER.parent.handlers[0].formatter)
+        self.statusBar.widget.setMaximumHeight(17)
         LOGGER.addHandler(self.statusBar)
         self.progressBar = widgets.dsProgressBar()
+        self.progressBar.setMaximumWidth(90)
         self.progressBar.hide()
         self.statusBar.widget.addPermanentWidget(self.progressBar)
 
@@ -193,7 +186,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.scroll_widget.contentLayout.addWidget(self.output_grp)
         self.main_layout.addWidget(self.playblast_btn)
         self.main_layout.addWidget(self.statusBar.widget)
-        self.main_layout.setContentsMargins(0, 0, 0, 2)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
 
         self.ffmpeg_layout = QtWidgets.QVBoxLayout()
         self.ffmpeg_layout.addWidget(self.ffmpeg_path)
@@ -219,7 +212,6 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         # Actions
         self.always_on_top_action.toggled.connect(self.toggle_always_on_top)
         self.set_maya_port_action.triggered.connect(self.set_maya_port)
-        self.connect_to_maya_action.triggered.connect(self.connect_to_maya)
         self.ffmpeg_help_action.triggered.connect(self.open_ffmpeg_web)
 
         # Inputs
@@ -230,18 +222,11 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.playblast_btn.clicked.connect(self.playblast)
 
         # Status bar
-        self.statusBar.widget.messageChanged.connect(self.toggleStatusBar)
-        self.progressBar.visibilityChanged.connect(self.toggleStatusBar)
+        self.progressBar.valueChanged.connect(self.logProgress)
 
     @QtCore.Slot()
     def toggle_always_on_top(self) -> None:
         self.always_on_top = not self.always_on_top
-
-    @QtCore.Slot()
-    def toggleStatusBar(self, state) -> None:
-        if self.progressBar.isVisible():
-            return
-        self.statusBar.widget.setVisible(bool(state))
 
     @QtCore.Slot()
     def open_ffmpeg_web(self):
@@ -249,20 +234,20 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot()
     def connect_to_maya(self) -> None:
-        LOGGER.info(f"TODO: Connecting to maya port {self.maya_port}")
+        LOGGER.info(f"TODO: Connecting to maya port {self.maya_client.port}")
 
     @QtCore.Slot()
     def set_maya_port(self) -> None:
         value, result = QtWidgets.QInputDialog.getInt(self, "Maya port",
                                                       "Current port:",
-                                                      value=self.maya_port,
+                                                      value=self.maya_client.port,
                                                       minValue=1025,
                                                       maxValue=65535)
         if not result:
             return
 
-        self.maya_port = value
-        LOGGER.info(f"Maya port set to {self.maya_port}")
+        self.maya_client.port = value
+        LOGGER.info(f"Maya port set to {value}")
 
     @QtCore.Slot()
     def validate_paths(self):
@@ -272,10 +257,72 @@ class PlayblastWindow(QtWidgets.QMainWindow):
             self.playblast_btn.setEnabled(True)
 
     @QtCore.Slot()
+    def logProgress(self, value):
+        if value == 0:
+            LOGGER.info("Initializing")
+        elif value == 1:
+            LOGGER.info("Connecting to Maya...")
+        elif value == 2:
+            LOGGER.info("Connected.")
+        elif value == 3:
+            LOGGER.info("Playblasting as avi...")
+        elif value == 4:
+            LOGGER.info("Converting to mp4")
+        elif value == 5:
+            LOGGER.info("Done.")
+
+    @QtCore.Slot()
+    def update_progress_bar(self):
+        self.progressBar.setValue(self.progressBar.value() + 1)
+        QtCore.QCoreApplication.processEvents()
+        time.sleep(0.2)
+
+    @QtCore.Slot()
     def playblast(self) -> None:
         self.progressBar.show()
         self.progressBar.setMinimum(0)
-        self.progressBar.setMaximum(0)
-        LOGGER.info("TODO: send playblast command to maya")
-        LOGGER.info("TODO: convert with ffmpeg")
-        # self.progressBar.hide()
+        self.progressBar.setMaximum(5)
+        self.progressBar.setValue(0)
+
+        # Playblast
+        self.update_progress_bar()
+        self.maya_client.connect()
+        self.update_progress_bar()
+        avi_result_path = self.output_path.get_path().replace(".mp4", ".avi")
+        # print(self.playblast_command())
+        self.update_progress_bar()
+        self.maya_client.send(self.playblast_command())
+        self.maya_client.disconnect()
+        self.update_progress_bar()
+
+        # Conversion
+        converter = ffmpegFn.Converter(self.ffmpeg_path.get_path(),
+                                       input_path=avi_result_path,
+                                       output_path=self.output_path.get_path())
+        errorStatus = converter.convert_avi_to_mp4()
+        if errorStatus:
+            QtCore.QCoreApplication.processEvents()
+            LOGGER.error(f"Failed to convert {avi_result_path}")
+            self.progressBar.hide()
+            return
+
+        self.update_progress_bar()
+        os.remove(avi_result_path)
+        self.progressBar.hide()
+        if self.output_viewer_checkbox.isChecked():
+            os.startfile(self.output_path.get_path())
+
+    def playblast_command(self) -> str:
+        avi_result_path = self.output_path.get_path().replace(".mp4", ".avi")
+        ornaments = self.output_ornaments_checkbox.isChecked()
+        quality = self.image_quality.spin_box.value()
+        offscreen = self.output_offscreen_checkbox.isChecked()
+        frame_padding = self.image_frame_padding.spin_box.value()
+        width, height = self.resolutions[self.image_size.currentIndex()][:2]
+        viever = self.output_viewer_checkbox.isChecked()
+        percent = self.image_scale.slider.value()
+        # ! TODO Add multi camera parameter to command string
+        multi_cam = self.output_multicamera_checkbox.isChecked()
+
+        cmd = f"maya.cmds.playblast(f='{avi_result_path}', orn={ornaments}, qlt={quality}, os={offscreen}, fp={frame_padding}, h={height}, w={width}, p={percent}, v=0, fmt='avi')"
+        return cmd

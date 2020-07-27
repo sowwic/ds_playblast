@@ -180,6 +180,9 @@ class BrowsePath(QtWidgets.QWidget):
             return
         self.path_line_edit.setText(result)
 
+    def get_path(self) -> str:
+        return self.path_line_edit.text()
+
 
 class ScrollWidget(QtWidgets.QWidget):
     def __init__(self, border=0, **kwargs):
@@ -207,7 +210,7 @@ class StatusLogger(logging.Handler):
     def __init__(self, level="DEBUG", parent=None, timeout=3000):
         super().__init__(level)
         self.widget = QtWidgets.QStatusBar(parent)
-        self.timeout = 3000
+        self.timeout = timeout
 
     def emit(self, record: logging.LogRecord):
         msg = self.format(record)
@@ -222,9 +225,7 @@ class dsProgressBar(QtWidgets.QProgressBar):
         super().__init__(parent=None)
 
     def showEvent(self, event):
-        # super().showEvent(event)
         self.visibilityChanged.emit(True)
 
     def hideEvent(self, event):
-        # super().hideEvent(event)
         self.visibilityChanged.emit(False)

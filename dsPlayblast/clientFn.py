@@ -7,11 +7,10 @@ LOGGER = logging.getLogger(__name__)
 class MayaClient(object):
     """
     """
-    PORT = 7221
     BUFFER_SIZE = 4096
 
-    def __init__(self):
-        self.port: int = MayaClient.port
+    def __init__(self, port=7221):
+        self.port: int = port
         self.maya_socket: socket.socket = None
 
     def connect(self, port: int = -1):
@@ -19,7 +18,7 @@ class MayaClient(object):
             self.port = port
         try:
             self.maya_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.maya_socket.connect("localhost", self.port)
+            self.maya_socket.connect(("localhost", self.port))
         except ConnectionRefusedError:
             LOGGER.error(f"Failed to connect to port {self.port}", exc_info=1)
             return False

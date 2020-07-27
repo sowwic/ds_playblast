@@ -2,8 +2,6 @@ import os
 import logging
 from PySide2 import QtWidgets
 import qdarkstyle
-from dsPlayblast import clientFn
-from dsPlayblast import playblastFn
 from dsPlayblast import playblastUI
 from dsPlayblast import loggingFn
 
