@@ -70,6 +70,12 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
         # Ffmpeg
         self.settings.setValue("ffmpeg_path", self.ffmpeg_path.path_line_edit.text())
+
+        # Time range
+        self.settings.setValue("time_range_mode", int(self.time_range.timeslider_radio.isChecked()))
+        self.settings.setValue("time_range_start_time", int(self.time_range.start_time.value()))
+        self.settings.setValue("time_range_end_time", int(self.time_range.end_time.value()))
+
         # Image
         self.settings.setValue("image_size_index", self.image_size.currentIndex())
         self.settings.setValue("image_quality", self.image_quality.spin_box.value())
@@ -80,8 +86,8 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.settings.setValue("output_viewer_checkbox_checked", int(self.output_viewer_checkbox.isChecked()))
         self.settings.setValue("output_ornaments_checkbox_checked", int(self.output_ornaments_checkbox.isChecked()))
         self.settings.setValue("output_removetemp_checkbox_checked", int(self.output_removetemp_checkbox.isChecked()))
+        self.settings.setValue("output_clearcache_checkbox_checked", int(self.output_clearcache_checkbox.isChecked()))
         self.settings.setValue("output_offscreen_checkbox_checked", int(self.output_offscreen_checkbox.isChecked()))
-        self.settings.setValue("output_multicamera_checkbox_checked", int(self.output_multicamera_checkbox.isChecked()))
 
     # Build components
     def create_actions(self):
@@ -114,6 +120,11 @@ class PlayblastWindow(QtWidgets.QMainWindow):
                                               file_dialog_title="Select FFmpeg executable",
                                               filters="ffmpeg.exe",
                                               button_text="...")
+        # Time range
+        self.time_range_grp = QtWidgets.QGroupBox("Time")
+        self.time_range = widgets.TimeRange(mode=self.settings.value("time_range_mode", defaultValue=0),
+                                            start_time=self.settings.value("time_range_start_time", defaultValue=0),
+                                            end_time=self.settings.value("time_range_end_time", defaultValue=120))
 
         # Image settings
         self.image_grp = QtWidgets.QGroupBox("Image")
@@ -152,14 +163,14 @@ class PlayblastWindow(QtWidgets.QMainWindow):
                                               filters="*.mp4")
         self.output_viewer_checkbox = QtWidgets.QCheckBox("Open viewer")
         self.output_ornaments_checkbox = QtWidgets.QCheckBox("Show ornaments")
-        self.output_offscreen_checkbox = QtWidgets.QCheckBox("Render offscreen")
-        self.output_multicamera_checkbox = QtWidgets.QCheckBox("Multi-camera output")
         self.output_removetemp_checkbox = QtWidgets.QCheckBox("Removed temporary files")
+        self.output_offscreen_checkbox = QtWidgets.QCheckBox("Render offscreen")
+        self.output_clearcache_checkbox = QtWidgets.QCheckBox("Clear cache")
         self.output_viewer_checkbox.setChecked(self.settings.value("output_viewer_checkbox_checked", defaultValue=1))
         self.output_ornaments_checkbox.setChecked(self.settings.value("output_ornaments_checkbox_checked", defaultValue=1))
-        self.output_offscreen_checkbox.setChecked(self.settings.value("output_offscreen_checkbox_checked", defaultValue=0))
-        self.output_multicamera_checkbox.setChecked(self.settings.value("output_multicamera_checkbox_checked", defaultValue=0))
         self.output_removetemp_checkbox.setChecked(self.settings.value("output_removetemp_checkbox_checked", defaultValue=1))
+        self.output_clearcache_checkbox.setChecked(self.settings.value("output_clearcache_checkbox_checked", defaultValue=1))
+        self.output_offscreen_checkbox.setChecked(self.settings.value("output_offscreen_checkbox_checked", defaultValue=0))
 
         # Buttons
         self.playblast_btn = QtWidgets.QPushButton("Playblast")
@@ -182,8 +193,10 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.main_widget.setLayout(self.main_layout)
         self.main_layout.addWidget(self.scroll_widget)
         self.scroll_widget.contentLayout.addWidget(self.ffmpeg_grp)
+        self.scroll_widget.contentLayout.addWidget(self.time_range_grp)
         self.scroll_widget.contentLayout.addWidget(self.image_grp)
         self.scroll_widget.contentLayout.addWidget(self.output_grp)
+        self.main_layout.addWidget(self.time_range)
         self.main_layout.addWidget(self.playblast_btn)
         self.main_layout.addWidget(self.statusBar.widget)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
@@ -191,6 +204,10 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.ffmpeg_layout = QtWidgets.QVBoxLayout()
         self.ffmpeg_layout.addWidget(self.ffmpeg_path)
         self.ffmpeg_grp.setLayout(self.ffmpeg_layout)
+
+        self.time_range_layout = QtWidgets.QVBoxLayout()
+        self.time_range_layout.addWidget(self.time_range)
+        self.time_range_grp.setLayout(self.time_range_layout)
 
         self.image_layout = QtWidgets.QVBoxLayout()
         self.image_layout.addWidget(self.image_size)
@@ -204,8 +221,8 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.output_layout.addWidget(self.output_viewer_checkbox)
         self.output_layout.addWidget(self.output_ornaments_checkbox)
         self.output_layout.addWidget(self.output_removetemp_checkbox)
+        self.output_layout.addWidget(self.output_clearcache_checkbox)
         self.output_layout.addWidget(self.output_offscreen_checkbox)
-        self.output_layout.addWidget(self.output_multicamera_checkbox)
         self.output_grp.setLayout(self.output_layout)
 
     def create_connections(self):
@@ -224,19 +241,19 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         # Status bar
         self.progressBar.valueChanged.connect(self.logProgress)
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def toggle_always_on_top(self) -> None:
         self.always_on_top = not self.always_on_top
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def open_ffmpeg_web(self):
         webbrowser.open(url="https://ffmpeg.org/", new=2, autoraise=True)
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def connect_to_maya(self) -> None:
         LOGGER.info(f"TODO: Connecting to maya port {self.maya_client.port}")
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def set_maya_port(self) -> None:
         value, result = QtWidgets.QInputDialog.getInt(self, "Maya port",
                                                       "Current port:",
@@ -249,14 +266,14 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.maya_client.port = value
         LOGGER.info(f"Maya port set to {value}")
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def validate_paths(self):
         if len(self.output_path.path_line_edit.text().split("/")) < 2 or not self.ffmpeg_path.path_line_edit.text().endswith("ffmpeg.exe"):
             self.playblast_btn.setEnabled(False)
         else:
             self.playblast_btn.setEnabled(True)
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def logProgress(self, value):
         if value == 0:
             LOGGER.info("Initializing")
@@ -271,13 +288,13 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         elif value == 5:
             LOGGER.info("Done.")
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def update_progress_bar(self):
         self.progressBar.setValue(self.progressBar.value() + 1)
         QtCore.QCoreApplication.processEvents()
         time.sleep(0.2)
 
-    @QtCore.Slot()
+    @ QtCore.Slot()
     def playblast(self) -> None:
         self.progressBar.show()
         self.progressBar.setMinimum(0)
@@ -289,7 +306,6 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.maya_client.connect()
         self.update_progress_bar()
         avi_result_path = self.output_path.get_path().replace(".mp4", ".avi")
-        # print(self.playblast_command())
         self.update_progress_bar()
         self.maya_client.send(self.playblast_command())
         self.maya_client.disconnect()
@@ -318,11 +334,22 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         quality = self.image_quality.spin_box.value()
         offscreen = self.output_offscreen_checkbox.isChecked()
         frame_padding = self.image_frame_padding.spin_box.value()
+        clear_cache = self.output_clearcache_checkbox.isChecked()
         width, height = self.resolutions[self.image_size.currentIndex()][:2]
-        viever = self.output_viewer_checkbox.isChecked()
         percent = self.image_scale.slider.value()
-        # ! TODO Add multi camera parameter to command string
-        multi_cam = self.output_multicamera_checkbox.isChecked()
+        if self.time_range.startend_radio.isChecked():
+            start_time = self.time_range.start_time.value()
+            end_time = self.time_range.end_time.value()
+        else:
+            start_time, end_time = self.get_maya_playback_time()
 
-        cmd = f"maya.cmds.playblast(f='{avi_result_path}', orn={ornaments}, qlt={quality}, os={offscreen}, fp={frame_padding}, h={height}, w={width}, p={percent}, v=0, fmt='avi')"
+        cmd = f"maya.cmds.playblast(f='{avi_result_path}', cc={clear_cache}, orn={ornaments}, qlt={quality}, os={offscreen}, fp={frame_padding}, h={height}, w={width}, p={percent}, st={start_time}, et={end_time}, v=0, fmt='avi', fo=1)"
         return cmd
+
+    def get_maya_playback_time(self):
+        start_time = self.maya_client.send("maya.cmds.playbackOptions(min=1, q=1)")
+        end_time = self.maya_client.send("maya.cmds.playbackOptions(max=1, q=1)")
+
+        start_time = float(start_time.strip("\n"))
+        end_time = float(end_time.strip("\n"))
+        return start_time, end_time

@@ -19,10 +19,6 @@ def main():
     mainWindow = playblastUI.PlayblastWindow()
     mainWindow.show()
 
-    # Debug
-    LOGGER.info(f"Settings: {mainWindow.settings.fileName()}")
-    LOGGER.info(f"Always on top: {mainWindow.always_on_top}")
-
     os.sys.exit(app.exec_())
 
 
