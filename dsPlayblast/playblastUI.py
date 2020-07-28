@@ -59,6 +59,10 @@ class PlayblastWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event):
         super().closeEvent(event)
         self.save_settings()
+        try:
+            self.maya_client.disconnect()
+        except AttributeError:
+            pass
 
     # Settings
     def save_settings(self):
@@ -324,7 +328,6 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         avi_result_path = self.output_path.get_path().replace(".mp4", ".avi")
         self.update_progress_bar()
         self.maya_client.send(self.playblast_command())
-        self.maya_client.disconnect()
         self.update_progress_bar()
 
         # Conversion

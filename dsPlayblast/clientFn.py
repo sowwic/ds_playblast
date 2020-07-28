@@ -26,6 +26,8 @@ class MayaClient(object):
         return True
 
     def disconnect(self):
+        if not self.maya_socket:
+            return False
         try:
             self.maya_socket.close()
         except BaseException:
