@@ -1,12 +1,27 @@
 import logging.config
+import logging.handlers
 from dsPlayblast import util
 
 
 def setup_logging():
     log_file = "playblast.log"
-    config_file = util.resource_path("configs/logging_config.ini")
-    logging.config.fileConfig(config_file, defaults={'logfilename': log_file}, disable_existing_loggers=False)
+    # Formatters
+    brief_formatter = logging.Formatter(fmt="%(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M")
+    verbose_formatter = logging.Formatter(fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
+    # Handlers
+    rfile_handler = logging.handlers.RotatingFileHandler(log_file, mode="a", maxBytes=1024, backupCount=1, delay=0)
+    rfile_handler.setLevel("DEBUG")
+    rfile_handler.setFormatter(verbose_formatter)
+    stream_handler = logging.StreamHandler()
+    stream_handler.setLevel("DEBUG")
+    stream_handler.setFormatter(brief_formatter)
+
+    # Root logger
+    logging.root.setLevel("DEBUG")
+    logging.root.addHandler(stream_handler)
+    logging.root.addHandler(rfile_handler)
 
 
 if __name__ == "__main__":
-    print(util.resource_path("logging_config.ini"))
+    setup_logging()
+    logging.root.info("Root logger")
