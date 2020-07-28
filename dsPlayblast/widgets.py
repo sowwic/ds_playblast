@@ -238,8 +238,9 @@ class TimeRange(QtWidgets.QWidget):
         # Widgets
         self.timeslider_radio = QtWidgets.QRadioButton("Time slider")
         self.startend_radio = QtWidgets.QRadioButton("Start/end")
-        self.timeslider_radio.setChecked(not mode)
-        self.startend_radio.setChecked(mode)
+        self.timeslider_radio.setChecked(mode)
+        self.startend_radio.setChecked(not mode)
+
         self.start_label = QtWidgets.QLabel("Start:")
         self.start_time = QtWidgets.QSpinBox()
         self.start_time.setMinimumWidth(50)
@@ -272,6 +273,8 @@ class TimeRange(QtWidgets.QWidget):
         self.main_layout.addLayout(self.time_range_layout)
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(self.main_layout)
+
+        # Apply selection
 
         self.startend_radio.toggled.connect(self.set_spinboxes_enabled)
 

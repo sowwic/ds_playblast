@@ -9,7 +9,7 @@ def setup_logging():
     brief_formatter = logging.Formatter(fmt="%(levelname)s | %(message)s", datefmt="%Y-%m-%d %H:%M")
     verbose_formatter = logging.Formatter(fmt="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
     # Handlers
-    rfile_handler = logging.handlers.RotatingFileHandler(log_file, mode="a", maxBytes=1024, backupCount=1, delay=0)
+    rfile_handler = logging.handlers.RotatingFileHandler(log_file, mode="a", maxBytes=1024, backupCount=0, delay=0)
     rfile_handler.setLevel("DEBUG")
     rfile_handler.setFormatter(verbose_formatter)
     stream_handler = logging.StreamHandler()

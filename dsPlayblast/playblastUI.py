@@ -4,11 +4,11 @@ import time
 import webbrowser
 from PySide2 import QtWidgets
 from PySide2 import QtCore
+from dsPlayblast import __version__
+from dsPlayblast import __author__
 from dsPlayblast import ffmpegFn
 from dsPlayblast import widgets
 from dsPlayblast import clientFn
-
-__version__ = 1.0
 
 LOGGER = logging.getLogger(__name__)
 
@@ -100,6 +100,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.always_on_top_action.setChecked(self.settings.value("always_on_top", 0))
         self.ffmpeg_help_action = QtWidgets.QAction("FFmpeg download", self)
         self.ffmpeg_help_action.setIcon(self.style().standardIcon(QtWidgets.QStyle.SP_DialogHelpButton))
+        self.about_help_action = QtWidgets.QAction("About", self)
 
         # Create menus
         self.options_menu = self.menuBar().addMenu("&Options")
@@ -108,6 +109,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
         self.help_menu = self.menuBar().addMenu("Help")
         self.help_menu.addAction(self.ffmpeg_help_action)
+        self.help_menu.addAction(self.about_help_action)
 
     def create_widgets(self):
         self.main_widget = QtWidgets.QWidget()
@@ -180,7 +182,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
 
         # Status bar
         # self.statusBar = QtWidgets.QStatusBar()
-        self.statusBar = widgets.StatusLogger(level="DEBUG", timeout=4000)
+        self.statusBar = widgets.StatusLogger(level="INFO", timeout=4000)
         self.statusBar.setFormatter(LOGGER.parent.handlers[0].formatter)
         self.statusBar.widget.setMaximumHeight(17)
         LOGGER.addHandler(self.statusBar)
@@ -232,6 +234,7 @@ class PlayblastWindow(QtWidgets.QMainWindow):
         self.always_on_top_action.toggled.connect(self.toggle_always_on_top)
         self.set_maya_port_action.triggered.connect(self.set_maya_port)
         self.ffmpeg_help_action.triggered.connect(self.open_ffmpeg_web)
+        self.about_help_action.triggered.connect(self.diplay_about_info)
 
         # Inputs
         self.ffmpeg_path.path_line_edit.textChanged.connect(self.validate_paths)
@@ -250,6 +253,13 @@ class PlayblastWindow(QtWidgets.QMainWindow):
     @ QtCore.Slot()
     def open_ffmpeg_web(self):
         webbrowser.open(url="https://ffmpeg.org/", new=2, autoraise=True)
+
+    @QtCore.Slot()
+    def diplay_about_info(self):
+        info_dialog = QtWidgets.QMessageBox(self)
+        info_dialog.setWindowTitle("About")
+        info_dialog.setText(f"Author: {__author__}\nVersion: {__version__}")
+        info_dialog.exec_()
 
     @ QtCore.Slot()
     def connect_to_maya(self) -> None:
