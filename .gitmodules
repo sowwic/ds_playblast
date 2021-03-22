@@ -1,0 +1,3 @@
+[submodule "qt_widgets_lib"]
+	path = qt_widgets_lib
+	url = https://github.com/S0nic014/qt_widgets_lib.git

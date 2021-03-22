@@ -1,0 +1,11 @@
+{
+    "image.quality": 100,
+    "image.scale": 1.0,
+    "image.fpadding": 4,
+    "out.path": "",
+    "out.viewer": true,
+    "out.ornaments": true,
+    "out.remove_temp": true,
+    "out.offscreen": false,
+    "out.clear_cache": true
+}
