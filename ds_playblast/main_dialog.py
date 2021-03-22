@@ -42,7 +42,7 @@ class MainDialog(MayaQWidgetDockableMixin, QtWidgets.QWidget):
         super(MainDialog, self).__init__()
         self.sizes_buffer = []
 
-        self.__class__.UI_INSTANC = self
+        self.__class__.UI_INSTANCE = self
         self.setObjectName(self.__class__.UI_NAME)
         self.setWindowTitle(self.WINDOW_TITLE)
         self.setMinimumSize(300, 165)
