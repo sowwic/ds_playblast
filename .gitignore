@@ -128,3 +128,6 @@ dmypy.json
 .playblastEnv/
 .vscode/
 .design/
+
+# User files
+config/user.json
