@@ -1,7 +1,9 @@
 import os
 import platform
-import subprocess
-from StringIO import StringIO
+try:
+    from StringIO import StringIO  # for Python 2
+except ImportError:
+    from io import StringIO  # for Python 3
 import pymel.core as pm
 
 from ds_playblast import Logger

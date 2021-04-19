@@ -14,6 +14,18 @@ import ds_playblast.playblastFn as playblastFn
 Logger.write_to_rotating_file("playblast.log")
 
 
+def add_widget_to_layout(widget, control_name):
+    if pm.workspaceControl(control_name, q=1, ex=1):
+        if os.sys.version_info[0] >= 3:
+            workspaceControlPtr = int(pma.MQtUtil.findControl(control_name))
+            widgetPtr = int(getCppPointer(widget)[0])
+        else:
+            workspaceControlPtr = long(pma.MQtUtil.findControl(control_name))
+            widgetPtr = long(getCppPointer(widget)[0])
+
+        pma.MQtUtil.addWidgetToMayaLayout(widgetPtr, workspaceControlPtr)
+
+
 class MainDialog(MayaQWidgetDockableMixin, QtWidgets.QWidget):
 
     WINDOW_TITLE = "dsPlayblast"
@@ -49,10 +61,7 @@ class MainDialog(MayaQWidgetDockableMixin, QtWidgets.QWidget):
 
         # Workspace control
         workspace_control_name = "{0}WorkspaceControl".format(self.UI_NAME)
-        if pm.workspaceControl(workspace_control_name, q=1, ex=1):
-            workspace_control_ptr = long(pma.MQtUtil.findControl(workspace_control_name))
-            widget_ptr = long(getCppPointer(self)[0])
-            pma.MQtUtil.addWidgetToMayaLayout(widget_ptr, workspace_control_ptr)
+        add_widget_to_layout(self, workspace_control_name)
 
         self.create_actions()
         self.create_widgets()
