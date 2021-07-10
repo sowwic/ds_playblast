@@ -1,5 +1,6 @@
 import os
 import platform
+import subprocess
 try:
     from StringIO import StringIO  # for Python 2
 except ImportError:
